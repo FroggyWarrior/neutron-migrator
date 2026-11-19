@@ -93,6 +93,11 @@ def main() -> None:
     ]
     for binary in binaries:
         cmd += ["--add-binary", f"{binary}{SEP}."]
+    for binary in binaries:
+        cmd += ["--add-binary", f"{binary}{SEP}."]
+    licenses = ROOT / "THIRD_PARTY_LICENSES"
+    if licenses.is_dir():
+        cmd += ["--add-data", f"{licenses}{SEP}THIRD_PARTY_LICENSES"]
     for module in EXCLUDES:
         cmd += ["--exclude-module", module]
 
