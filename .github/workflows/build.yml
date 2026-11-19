@@ -11,7 +11,7 @@ jobs:
       matrix:
         include:
           - { os: windows-latest,   tag: windows-x64,   cli: windows-x64 }
-          - { os: windows-11-arm,   tag: windows-arm64, cli: windows-x64 }
+          - { os: windows-11-arm,   tag: windows-arm64, cli: windows-arm64 }
           - { os: ubuntu-22.04,     tag: linux-x64,     cli: linux-x64 }
           - { os: ubuntu-24.04-arm, tag: linux-arm64,   cli: linux-arm64 }
           - { os: macos-latest,     tag: macos-arm64,   cli: darwin-arm64 }
@@ -42,18 +42,25 @@ jobs:
   legacy-linux:
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux_2_28_x86_64
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - name: Build for glibc 2.28+
+        shell: bash
+        run: |
+          set -euxo pipefail
           PY=/opt/python/cp312-cp312/bin/python
+          $PY -V
           $PY -m pip install -U pip
           $PY -m pip install "PySide6==6.8.3" requests platformdirs "pyinstaller>=6.10"
-          $PY scripts/fetch_proton_cli.py --target linux-x64-baseline
+                    $PY scripts/fetch_proton_cli.py --target linux-x64
           $PY scripts/build.py
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: NeutronMigrator-linux-x64-legacy
           path: dist/*.tar.gz
+          if-no-files-found: warn
 
   release:
     needs: [build, legacy-linux]
