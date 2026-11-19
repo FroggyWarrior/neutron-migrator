@@ -1,0 +1,67 @@
+name: build
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest,   tag: windows-x64,   cli: windows-x64 }
+          - { os: windows-11-arm,   tag: windows-arm64, cli: windows-x64 }
+          - { os: ubuntu-22.04,     tag: linux-x64,     cli: linux-x64 }
+          - { os: ubuntu-24.04-arm, tag: linux-arm64,   cli: linux-arm64 }
+          - { os: macos-latest,     tag: macos-arm64,   cli: darwin-arm64 }
+          - { os: macos-15-intel,   tag: macos-x64,     cli: darwin-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -U pip
+      - run: pip install -r requirements.txt "pyinstaller>=6.10"
+      - run: python scripts/fetch_proton_cli.py --target ${{ matrix.cli }}
+      - run: python scripts/build.py
+      - name: AppImage
+        if: startsWith(matrix.tag, 'linux')
+        run: |
+          sudo apt-get update && sudo apt-get install -y libfuse2 desktop-file-utils
+          bash scripts/make_appimage.sh
+      - name: DMG
+        if: startsWith(matrix.tag, 'macos')
+        run: hdiutil create -volname "Neutron Migrator" -srcfolder "dist/Neutron Migrator.app" -ov -format UDZO "dist/NeutronMigrator-${{ matrix.tag }}.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeutronMigrator-${{ matrix.tag }}
+          path: dist/*
+
+  legacy-linux:
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux_2_28_x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          PY=/opt/python/cp312-cp312/bin/python
+          $PY -m pip install -U pip
+          $PY -m pip install "PySide6==6.8.3" requests platformdirs "pyinstaller>=6.10"
+          $PY scripts/fetch_proton_cli.py --target linux-x64-baseline
+          $PY scripts/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeutronMigrator-linux-x64-legacy
+          path: dist/*.tar.gz
+
+  release:
+    needs: [build, legacy-linux]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Neutron Migrator
+Comment=Download or delete all your Proton Drive photos
+Exec=neutron-migrator
+Icon=neutron-migrator
+Categories=Utility;FileTransfer;
+Terminal=false
+StartupWMClass=Neutron Migrator

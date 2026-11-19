@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build / packaging
+build/
+dist/
+*.spec
+*.AppImage
+AppDir/
+
+# Downloaded engine binaries (~100 MB each, fetched by scripts/fetch_proton_cli.py)
+vendor/
+
+# Logs & local state
+*.log
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
