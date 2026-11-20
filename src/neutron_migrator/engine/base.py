@@ -8,6 +8,15 @@ PHOTO_EXTENSIONS = frozenset({
     "raf", "orf", "rw2", "srw", "pef", "x3f", "3fr", "erf",
 })
 
+VIDEO_EXTENSIONS = frozenset({
+    "mp4", "mov", "m4v", "avi", "mkv", "webm", "3gp", "3g2", "mts", "m2ts",
+    "mpg", "mpeg", "wmv", "hevc", "insv",
+})
+
+
+def is_video(path: str) -> bool:
+    return path.rsplit(".", 1)[-1].lower() in VIDEO_EXTENSIONS if "." in path else False
+
 PHOTO_FOLDER_HINTS = ("my photos", "mis fotos", "mis fotografías", "photos", "fotos", "mes photos", "meine fotos")
 
 
@@ -25,6 +34,9 @@ class Photo:
 @dataclass
 class ScanResult:
     photos: list[Photo] = field(default_factory=list)
+    unknown_sizes: int = 0
+    videos: int = 0
+    video_bytes: int = 0
 
     @property
     def count(self) -> int:

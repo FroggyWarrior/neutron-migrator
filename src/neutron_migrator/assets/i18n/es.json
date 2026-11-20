@@ -119,5 +119,8 @@
   "error.download_failed": "No se ha podido completar la descarga.",
   "error.delete_failed": "No se ha podido completar el borrado.",
   "error.timeout": "La operación ha superado el tiempo máximo.",
-  "home.account_fallback": "tu cuenta de Proton"
+  "home.account_fallback": "tu cuenta de Proton",
+  "action.include_videos": "Incluir los vídeos de la línea de tiempo",
+  "action.unknown_sizes": "{count} elementos no informan de su tamaño; el total mostrado es un mínimo.",
+  "action.videos_skipped": "Se excluyen {count} vídeos ({size}). Marca la casilla de arriba para incluirlos."
 }

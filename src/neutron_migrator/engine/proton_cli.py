@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .. import security
 from ..errors import AppError, Cancelled
-from .base import BatchResult, Photo, Progress, ScanResult, is_photo
+from .base import BatchResult, Photo, Progress, ScanResult, is_photo, is_video
 
 BINARY = "proton-drive.exe" if os.name == "nt" else "proton-drive"
 CHUNK = 40          # keeps argv well below the Windows 32k limit
@@ -86,7 +86,9 @@ class ProtonCliEngine:
 
     def _popen(self, args: list[str]) -> subprocess.Popen:
         cmd = [str(self.exe), *args]
-        self._log.append("$ " + " ".join(cmd[:6]) + (" …" if len(cmd) > 6 else ""))
+        paths = [a for a in args if a.startswith("/")]
+        rest = [a for a in args if not a.startswith("/")]
+        self._log.append("$ " + " ".join(rest) + (f" [{len(paths)} remote paths]" if paths else ""))
         proc = subprocess.Popen(  # noqa: S603
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             encoding="utf-8", errors="replace", env=self._env(),
@@ -197,6 +199,18 @@ class ProtonCliEngine:
             return name.get("value") or (name.get("error") or {}).get("name") or node.get("uid", "")
         return name or node.get("uid", "")
 
+    @staticmethod
+    def _node_size(node: dict) -> tuple[int, bool]:
+        revision = node.get("activeRevision") or {}
+        for source in (revision, node):
+            for key in ("claimedSize", "size", "originalSize", "storageSize", "fileSize"):
+                value = source.get(key)
+                if isinstance(value, (int, float)) and value > 0:
+                    return int(value), True
+                if isinstance(value, str) and value.isdigit() and int(value) > 0:
+                    return int(value), True
+        return 0, False
+
     def log_tail(self, lines: int = 60) -> str:
         tail = list(self._log)[-lines:]
         for candidate in (self.state_dir / "proton-drive.log", self.state_dir / "Logs" / "proton-drive.log"):
@@ -298,25 +312,41 @@ class ProtonCliEngine:
     def preferred_scope(self, folders: list[str]) -> str:
         return ""
 
-    def scan(self, scope: str, cancel) -> ScanResult:
+    def scan(self, scope: str, cancel, include_videos: bool = False) -> ScanResult:
         photos: list[Photo] = []
+        unknown = videos = video_bytes = 0
+        samples: list[dict] = []
 
         def on_line(line: str) -> None:
+            nonlocal unknown, videos, video_bytes
             node = self._parse_item(line)
             if not isinstance(node, dict) or "uid" not in node:
                 return
-            if node.get("type") not in (None, "photo"):
-                return
+            if len(samples) < 3:
+                samples.append(node)
             name = self._node_name(node)
-            if "." in name and not is_photo(name):
+            size, known = self._node_size(node)
+            if is_video(name) or node.get("type") == "video":
+                videos += 1
+                video_bytes += size
+                if not include_videos:
+                    return
+            elif "." in name and not is_photo(name):
                 return
-            size = int(((node.get("activeRevision") or {}).get("claimedSize")) or 0)
+            if not known:
+                unknown += 1
             photos.append(Photo(path=node["uid"], size=size, name=name))
 
         code = self._stream(["photo", "timeline", "--json", "--load-details"], cancel, on_line, timeout=7200)
+        if os.environ.get("NEUTRON_DEBUG_SCAN"):
+            try:
+                (self.state_dir / "scan-sample.json").write_text(
+                    json.dumps(samples, indent=2, ensure_ascii=False), "utf-8")
+            except OSError:
+                pass
         if code != 0:
             raise AppError("error.scan_failed", debug=f"photo timeline exit={code}\n{self.log_tail(80)}")
-        return ScanResult(sorted(photos, key=lambda p: p.name.lower()))
+        return ScanResult(sorted(photos, key=lambda p: p.name.lower()), unknown, videos, video_bytes)
 
     @staticmethod
     def _local_stats(folder: Path) -> tuple[int, int]:
@@ -338,12 +368,29 @@ class ProtonCliEngine:
         done = skipped = transferred = 0
         failures: list[tuple[str, str]] = []
         cancelled = False
+        history: deque[tuple[float, int]] = deque(maxlen=64)
+        last_walk = [0.0, float(base_bytes)]
 
         def tick() -> None:
-            _files, size = self._local_stats(dest)
+            now = time.monotonic()
+            if now - last_walk[0] >= 1.0:
+                last_walk[0] = now
+                last_walk[1] = float(self._local_stats(dest)[1])
+            got = max(0.0, last_walk[1] - base_bytes)
+            history.append((now, got))
+            while len(history) > 2 and now - history[0][0] > 10.0:
+                history.popleft()
+            speed = 0.0
+            if len(history) >= 2:
+                dt = history[-1][0] - history[0][0]
+                db = history[-1][1] - history[0][1]
+                if dt >= 1.0:
+                    speed = max(0.0, db / dt)
+            shown = min(got, total_bytes) if total_bytes else got
+            remaining = max(0.0, total_bytes - shown)
             report(Progress(done_files=min(done + skipped, total), total_files=total,
-                            done_bytes=min(max(0, size - base_bytes), total_bytes),
-                            total_bytes=total_bytes))
+                            done_bytes=int(shown), total_bytes=total_bytes,
+                            speed=speed, eta=(remaining / speed) if speed > 0 else None))
 
         try:
             for chunk in _chunks(photos, CHUNK):

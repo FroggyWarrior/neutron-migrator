@@ -3,15 +3,17 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QRegularExpressionValidator
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QFileDialog, QFrame,
-                               QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton,
-                               QRadioButton, QVBoxLayout, QWidget)
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices, QGuiApplication
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QFileDialog, QHBoxLayout,
+                               QLabel, QLineEdit, QProgressBar, QRadioButton, QVBoxLayout,
+                               QWidget)
 
-from ..errors import AppError, Cancelled, Challenge
+from ..errors import AppError, Cancelled
+from ..security import redact
 from ..workers import run
-from .widgets import button, card, format_eta, format_size, label, open_folder, show_error
+from .widgets import (ErrorDialog, button, card, format_eta, format_size, label, open_folder,
+                      show_error)
 
 
 class Screen(QWidget):
@@ -28,9 +30,6 @@ class Screen(QWidget):
         if isinstance(exc, Cancelled):
             return
         show_error(self, self.ctx, exc)
-
-    def busy(self, active: bool) -> None:
-        pass
 
 
 # --------------------------------------------------------------------- login
@@ -49,13 +48,14 @@ class LoginScreen(Screen):
         self.status = QLabel()
         self.status.setObjectName("muted")
         self.status.setWordWrap(True)
+
         self.url_hint = label(self.i18n, "login.url_hint", "muted", wrap=True)
         self.url = QLineEdit()
         self.url.setReadOnly(True)
         self.open_btn = button(self.i18n, "login.open_browser")
-        self.open_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(self.url.text())))
+        self.open_btn.clicked.connect(self._open_browser)
         self.copy_btn = button(self.i18n, "login.copy_link")
-        self.copy_btn.clicked.connect(lambda: QGuiApplication.clipboard().setText(self.url.text()))
+        self.copy_btn.clicked.connect(self._copy_link)
         for widget in (self.url_hint, self.url, self.open_btn, self.copy_btn):
             widget.setVisible(False)
 
@@ -65,7 +65,7 @@ class LoginScreen(Screen):
         self.resume.clicked.connect(self.resume_session)
         self.resume.setVisible(False)
         self.cancel_btn = button(self.i18n, "common.cancel")
-        self.cancel_btn.clicked.connect(lambda: self.worker and self.worker.cancel())
+        self.cancel_btn.clicked.connect(self._cancel)
         self.cancel_btn.setVisible(False)
 
         for widget in (self.keep, self.status, self.url_hint, self.url):
@@ -86,20 +86,31 @@ class LoginScreen(Screen):
 
         self.i18n.bind(self.status, "login.starting")
         self.signin.setEnabled(False)
-        self.worker = run(self, lambda c, r: (ctx.engine.start(), ctx.engine.has_saved_session())[1],
-                          self._ready, self._start_failed)
+        self.keep.setEnabled(False)
+        self.worker = run(self, lambda c, r: self._startup(), self._ready, self._start_failed)
 
-    def _ready(self, saved: bool) -> None:
+    # -- engine bootstrap (off the UI thread)
+    def _startup(self):
+        self.ctx.engine.start()
+        saved = self.ctx.engine.has_saved_session()
+        account = self.ctx.engine.account_name() if saved else ""
+        return saved, account
+
+    def _ready(self, result) -> None:
+        saved, account = result
         self.signin.setEnabled(True)
+        self.keep.setEnabled(True)
         self.status.clear()
         if saved:
-            self.ctx.account = self.ctx.engine.account_name()
+            self.ctx.account = account
             self.resume.setVisible(True)
 
     def _start_failed(self, exc) -> None:
+        self.keep.setEnabled(True)
         self.fail(exc)
         self.i18n.bind(self.status, "error.cli_start")
 
+    # -- sign-in
     def _launch(self, fn) -> None:
         self.signin.setEnabled(False)
         self.resume.setEnabled(False)
@@ -108,18 +119,33 @@ class LoginScreen(Screen):
         self.worker = run(self, fn, self._done, self._auth_failed, self._on_progress)
 
     def sign_in(self) -> None:
-        self._launch(lambda c, r: (self.ctx.engine.login_via_browser(c, r),
-                                   self.ctx.engine.account_name())[1])
+        engine = self.ctx.engine
+        self._launch(lambda c, r: (engine.login_via_browser(c, r), engine.account_name())[1])
 
     def resume_session(self) -> None:
-        self._launch(lambda c, r: (self.ctx.engine.resume(),
-                                   self.ctx.engine.account_name())[1])
+        engine = self.ctx.engine
+        self._launch(lambda c, r: (engine.resume(), engine.account_name())[1])
+
+    def _cancel(self) -> None:
+        if self.worker:
+            self.worker.cancel()
 
     def _on_progress(self, payload) -> None:
         if isinstance(payload, dict) and payload.get("signInUrl"):
             self.url.setText(payload["signInUrl"])
             for widget in (self.url_hint, self.url, self.open_btn, self.copy_btn):
                 widget.setVisible(True)
+
+    def _open_browser(self) -> None:
+        QDesktopServices.openUrl(QUrl(self.url.text()))
+
+    def _copy_link(self) -> None:
+        QGuiApplication.clipboard().setText(self.url.text())
+        self.i18n.bind(self.copy_btn, "common.copied")
+        QTimer.singleShot(1500, self._restore_copy_label)
+
+    def _restore_copy_label(self) -> None:
+        self.i18n.bind(self.copy_btn, "login.copy_link")
 
     def _done(self, account) -> None:
         self.ctx.account = account or ""
@@ -172,9 +198,10 @@ class HomeScreen(Screen):
     def _sign_out(self) -> None:
         self.signout.setEnabled(False)
         self.status.setVisible(True)
-        self.worker = run(self, lambda c, r: self.ctx.engine.sign_out(), self._signed_out, self._sign_out_failed)
+        self.worker = run(self, lambda c, r: self.ctx.engine.sign_out(),
+                          self._signed_out, self._sign_out_failed)
 
-    def _signed_out(self, _r) -> None:
+    def _signed_out(self, _result) -> None:
         self.ctx.account = ""
         self.ctx.settings.keep_session = False
         self.ctx.settings.save()
@@ -193,6 +220,8 @@ class ActionScreen(Screen):
         self.kind = kind
         self.scan_result = None
         self._pending_home = False
+        self._scan_notes = ""
+        self._elapsed = 0
         self.root.addWidget(label(self.i18n, f"action.{kind}_title", "h1"))
 
         options, lay = card()
@@ -207,6 +236,12 @@ class ActionScreen(Screen):
         scope_row.addWidget(self.rescan)
         lay.addLayout(scope_row)
 
+        self.videos = QCheckBox()
+        self.i18n.bind(self.videos, "action.include_videos")
+        self.videos.setChecked(getattr(ctx.settings, "include_videos", False))
+        self.videos.toggled.connect(self._videos_changed)
+        lay.addWidget(self.videos)
+
         self.destination = QLineEdit()
         self.destination.setReadOnly(True)
         self.destination.setText(ctx.settings.last_destination)
@@ -217,6 +252,7 @@ class ActionScreen(Screen):
         self.dest_row = QHBoxLayout()
         self.dest_row.addWidget(self.destination, 1)
         self.dest_row.addWidget(self.browse)
+
         self.mode_group = QButtonGroup(self)
         self.trash = QRadioButton()
         self.permanent = QRadioButton()
@@ -234,15 +270,14 @@ class ActionScreen(Screen):
         if kind == "download":
             lay.addLayout(self.dest_row)
             lay.addWidget(self.dest_hint)
-            mode_widgets = ()
+            self.mode_widgets = ()
         else:
             lay.addWidget(label(self.i18n, "action.delete_mode"))
             lay.addWidget(self.trash)
             lay.addWidget(self.permanent)
             lay.addWidget(self.perm_warning)
             lay.addWidget(self.ack)
-            mode_widgets = (self.perm_warning, self.ack)
-        self.mode_widgets = mode_widgets
+            self.mode_widgets = (self.perm_warning, self.ack)
         self.root.addWidget(options)
 
         summary, slay = card()
@@ -264,7 +299,8 @@ class ActionScreen(Screen):
 
         self.back = button(self.i18n, "common.back")
         self.back.clicked.connect(self._go_back)
-        self.confirm = button(self.i18n, "common.confirm", "danger" if kind == "delete" else "primary")
+        self.confirm = button(self.i18n, "common.confirm",
+                              "danger" if kind == "delete" else "primary")
         self.confirm.clicked.connect(self._confirm)
         self.confirm.setEnabled(False)
         footer = QHBoxLayout()
@@ -273,19 +309,19 @@ class ActionScreen(Screen):
         footer.addWidget(self.confirm)
         self.root.addLayout(footer)
 
-        self._mode_changed()
+        self._mode_changed()  # every widget exists at this point
 
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
-        self._elapsed = 0
         self._load_scopes()
 
     # -- setup
     def _load_scopes(self) -> None:
         self.i18n.bind(self.summary, "action.loading")
         self.scan_bar.setVisible(True)
-        self.worker = run(self, lambda c, r: self.ctx.engine.root_folders(), self._scopes_ready, self._scan_failed)
+        self.worker = run(self, lambda c, r: self.ctx.engine.root_folders(),
+                          self._scopes_ready, self._scan_failed)
 
     def _scopes_ready(self, folders: list[str]) -> None:
         self.scope.blockSignals(True)
@@ -308,12 +344,17 @@ class ActionScreen(Screen):
         self.ctx.settings.save()
         self.start_scan()
 
-    def _mode_changed(self, *_a) -> None:
+    def _videos_changed(self) -> None:
+        self.ctx.settings.include_videos = self.videos.isChecked()
+        self.ctx.settings.save()
+        self.start_scan()
+
+    def _mode_changed(self, *_args) -> None:
         permanent = self.permanent.isChecked()
         self.ctx.settings.delete_mode = "permanent" if permanent else "trash"
         self.ctx.settings.save()
-        for w in self.mode_widgets:
-            w.setVisible(permanent)
+        for widget in self.mode_widgets:
+            widget.setVisible(permanent)
         if not permanent:
             self.ack.setChecked(False)
         self._update_confirm()
@@ -330,6 +371,7 @@ class ActionScreen(Screen):
     # -- scan
     def start_scan(self) -> None:
         self.scan_result = None
+        self._scan_notes = ""
         self.confirm.setEnabled(False)
         self.warning.setVisible(False)
         self.scan_bar.setVisible(True)
@@ -337,7 +379,9 @@ class ActionScreen(Screen):
         self._timer.start()
         self.i18n.bind(self.summary, "action.scanning", seconds=0)
         scope = self.scope.currentData() or ""
-        self.worker = run(self, lambda c, r: self.ctx.engine.scan(scope, c), self._scan_done, self._scan_failed)
+        include_videos = self.videos.isChecked()
+        self.worker = run(self, lambda c, r: self.ctx.engine.scan(scope, c, include_videos),
+                          self._scan_done, self._scan_failed)
 
     def _tick(self) -> None:
         self._elapsed += 1
@@ -355,6 +399,15 @@ class ActionScreen(Screen):
         else:
             self.i18n.bind(self.summary, "action.found", count=result.count,
                            size=format_size(self.i18n, result.total_bytes))
+        notes = []
+        unknown = getattr(result, "unknown_sizes", 0)
+        videos = getattr(result, "videos", 0)
+        if unknown:
+            notes.append(self.i18n.t("action.unknown_sizes", count=unknown))
+        if videos and not self.videos.isChecked():
+            notes.append(self.i18n.t("action.videos_skipped", count=videos,
+                                     size=format_size(self.i18n, getattr(result, "video_bytes", 0))))
+        self._scan_notes = "\n".join(notes)
         self._update_confirm()
 
     def _scan_failed(self, exc) -> None:
@@ -370,7 +423,7 @@ class ActionScreen(Screen):
     def _update_confirm(self) -> None:
         result = self.scan_result
         ready = bool(result and result.count)
-        self.warning.setVisible(False)
+        messages = [self._scan_notes] if self._scan_notes else []
         if ready and self.kind == "download":
             dest = self.destination.text()
             if not dest or not Path(dest).is_dir():
@@ -379,16 +432,19 @@ class ActionScreen(Screen):
                 free = shutil.disk_usage(dest).free
                 if free < result.total_bytes * 1.02:
                     ready = False
-                    self.warning.setText(self.i18n.t("action.free_space",
-                                                     free=format_size(self.i18n, free),
-                                                     needed=format_size(self.i18n, result.total_bytes)))
-                    self.warning.setVisible(True)
+                    messages.append(self.i18n.t(
+                        "action.free_space",
+                        free=format_size(self.i18n, free),
+                        needed=format_size(self.i18n, result.total_bytes)))
         if ready and self.kind == "delete" and self.permanent.isChecked():
             ready = self.ack.isChecked()
         self.confirm.setEnabled(ready)
+        self.warning.setText("\n".join(m for m in messages if m))
+        self.warning.setVisible(bool(messages))
         if result and result.count:
             key = ("action.confirm_download" if self.kind == "download"
-                   else "action.confirm_permanent" if self.permanent.isChecked() else "action.confirm_trash")
+                   else "action.confirm_permanent" if self.permanent.isChecked()
+                   else "action.confirm_trash")
             self.i18n.bind(self.confirm, key, count=result.count)
         else:
             self.i18n.bind(self.confirm, "common.confirm")
@@ -396,9 +452,9 @@ class ActionScreen(Screen):
     def _confirm(self) -> None:
         if not self.scan_result:
             return
+        mode = "permanent" if self.kind == "delete" and self.permanent.isChecked() else "trash"
         self.ctx.go("progress", kind=self.kind, photos=self.scan_result.photos,
-                    destination=self.destination.text(),
-                    mode="permanent" if self.kind == "delete" and self.permanent.isChecked() else "trash")
+                    destination=self.destination.text(), mode=mode)
 
     def _go_back(self) -> None:
         if self.worker and self.worker.isRunning():
@@ -438,7 +494,6 @@ class ProgressScreen(Screen):
         footer.addStretch(1)
         footer.addWidget(self.cancel_btn)
         self.root.addLayout(footer)
-        self.total_bytes = sum(p.size for p in photos)
         QTimer.singleShot(0, self._start)
 
     def _start(self) -> None:
@@ -453,8 +508,12 @@ class ProgressScreen(Screen):
     def _progress(self, p) -> None:
         if p.stage == "empty_trash":
             self.i18n.bind(self.title, "progress.emptying")
-        ratio = (p.done_bytes / p.total_bytes) if p.total_bytes else (
-            (p.done_files / p.total_files) if p.total_files else 0.0)
+        if p.total_bytes:
+            ratio = p.done_bytes / p.total_bytes
+        elif p.total_files:
+            ratio = p.done_files / p.total_files
+        else:
+            ratio = 0.0
         self.bar.setRange(0, 1000)
         self.bar.setValue(int(min(1.0, ratio) * 1000))
         if self.kind == "download":
@@ -479,7 +538,8 @@ class ProgressScreen(Screen):
 
     def _failed(self, exc) -> None:
         self.fail(exc)
-        self.ctx.go("login" if isinstance(exc, AppError) and exc.key == "error.session_expired" else "home")
+        expired = isinstance(exc, AppError) and exc.key == "error.session_expired"
+        self.ctx.go("login" if expired else "home")
 
 
 # -------------------------------------------------------------------- result
@@ -508,7 +568,8 @@ class ResultScreen(Screen):
             warn.setWordWrap(True)
             lay.addWidget(warn)
         if result.failures:
-            lay.addWidget(label(self.i18n, "result.failures", "warning", wrap=True, failed=len(result.failures)))
+            lay.addWidget(label(self.i18n, "result.failures", "warning", wrap=True,
+                                failed=len(result.failures)))
         self.root.addWidget(frame)
         self.root.addStretch(1)
 
@@ -534,7 +595,6 @@ class ResultScreen(Screen):
         if self.result.warning_debug:
             lines += ["Warning:", self.result.warning_debug, ""]
         lines += ["Failed items:"] + [f"- {path}\n  {error}" for path, error in self.result.failures]
-        from ..security import redact
-        from .widgets import ErrorDialog
-        ErrorDialog(self, self.ctx, self.ctx.i18n.t("result.failures", failed=len(self.result.failures)),
+        ErrorDialog(self, self.ctx,
+                    self.ctx.i18n.t("result.failures", failed=len(self.result.failures)),
                     redact("\n".join(lines)), title_key="common.debug").exec()

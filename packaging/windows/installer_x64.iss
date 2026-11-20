@@ -1,5 +1,5 @@
 #define AppName "Neutron Migrator"
-#define AppVersion "1.0.0"
+#define AppVersion "1.0.3"
 #define AppExe "Neutron Migrator.exe"
 
 [Setup]

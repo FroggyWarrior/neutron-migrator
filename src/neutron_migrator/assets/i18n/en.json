@@ -119,5 +119,8 @@
   "error.download_failed": "The download could not be completed.",
   "error.delete_failed": "The deletion could not be completed.",
   "error.timeout": "The operation timed out.",
-  "home.account_fallback": "your Proton account"
+  "home.account_fallback": "your Proton account",
+  "action.include_videos": "Include videos from the photo timeline",
+  "action.unknown_sizes": "{count} items report no size; the total shown is a lower bound.",
+  "action.videos_skipped": "{count} videos ({size}) are excluded. Tick the box above to include them."
 }
