@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>me.froggywarrior.neutron_migrator</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>Neutron Migrator</name>
+  <summary>Download or delete all your Proton Drive photos</summary>
+  <description>
+    <p>
+      Neutron Migrator scans your Proton Drive photo timeline, shows how many photos
+      and how much space they take, and then downloads them to a folder you choose or
+      deletes them (to the trash or permanently). Sign-in happens in your browser
+      through the official Proton Drive CLI.
+    </p>
+    <p>This is a third-party application, not officially supported by Proton AG.</p>
+  </description>
+  <launchable type="desktop-id">neutron-migrator.desktop</launchable>
+  <developer id="me.froggywarrior">
+    <name>FroggyWarrior</name>
+  </developer>
+  <url type="homepage">https://github.com/FroggyWarrior/neutron-migrator</url>
+  <url type="bugtracker">https://github.com/FroggyWarrior/neutron-migrator/issues</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.4" date="2026-11-21"/>
+  </releases>
+  <provides>
+    <binary>neutron-migrator</binary>
+  </provides>
+</component>

@@ -1,4 +1,5 @@
 name: build
+
 on:
   push:
     tags: ["v*"]
@@ -21,26 +22,36 @@ jobs:
           - { os: macos-15-intel,   tag: macos-x64,     cli: darwin-x64 }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: python -m pip install -U pip
-      - run: pip install -r requirements.txt "pyinstaller>=6.10"
-      - run: python scripts/fetch_proton_cli.py --target ${{ matrix.cli }}
-      - run: python scripts/build.py
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -r requirements.txt "pyinstaller>=6.10"
+      - name: Fetch Proton Drive CLI
+        run: python scripts/fetch_proton_cli.py --target ${{ matrix.cli }}
+      - name: Build
+        run: python scripts/build.py
       - name: AppImage
         if: startsWith(matrix.tag, 'linux')
         run: |
-          sudo apt-get update && sudo apt-get install -y libfuse2 desktop-file-utils
+          sudo apt-get update
+          sudo apt-get install -y file desktop-file-utils appstream
           bash scripts/make_appimage.sh
       - name: DMG
         if: startsWith(matrix.tag, 'macos')
         run: hdiutil create -volname "Neutron Migrator" -srcfolder "dist/Neutron Migrator.app" -ov -format UDZO "dist/NeutronMigrator-${{ matrix.tag }}.dmg"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: NeutronMigrator-${{ matrix.tag }}
-          path: dist/*
+          if-no-files-found: error
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.AppImage
+            dist/*.dmg
 
   legacy-linux:
     runs-on: ubuntu-latest
@@ -51,7 +62,7 @@ jobs:
         run: |
           dnf -y install python3.12 python3.12-pip binutils git findutils which
           python3.12 -V
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build for glibc 2.28+
         shell: bash
         run: |
@@ -60,7 +71,7 @@ jobs:
           python3.12 -m pip install "PySide6==6.8.3" requests platformdirs "pyinstaller>=6.10"
           python3.12 scripts/fetch_proton_cli.py --target linux-x64
           python3.12 scripts/build.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: NeutronMigrator-linux-x64-legacy
@@ -72,8 +83,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
-        with: { path: artifacts, merge-multiple: true }
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*
+          generate_release_notes: true
