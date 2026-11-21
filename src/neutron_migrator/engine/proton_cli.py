@@ -477,64 +477,106 @@ class ProtonCliEngine:
     def delete(self, photos: list[Photo], mode: str, cancel, report, concurrency: int = 4) -> BatchResult:
         permanent = mode == "permanent"
         total = len(photos)
-        weight = {p.path: float(p.size or 1) for p in photos}
-        total_weight = sum(weight.values()) or 1.0
+        total_weight = sum(float(p.size or 1) for p in photos) or 1.0
         names = {p.path: p.name or p.path for p in photos}
-        done = 0
-        gained = 0.0
         failures: list[tuple[str, str]] = []
-        trashed: list[str] = []
+        trashed: set[str] = set()
+        trash_done = deleted = 0
+        cancelled = False
+        warning_key = warning_debug = ""
 
-        def emit(current: str = "") -> None:
-            report(Progress(done, total, int(gained), int(total_weight), current=current))
+        def fraction() -> float:
+            if not total:
+                return 0.0
+            if permanent:
+                return min(1.0, (trash_done + deleted) / (2.0 * total))
+            return min(1.0, trash_done / total)
 
-        def handle(result: dict, share: float, counts_done: bool, collect: bool) -> None:
-            nonlocal done, gained
+        def emit(current: str = "", stage: str = "") -> None:
+            report(Progress(done_files=deleted if permanent else trash_done,
+                            total_files=total,
+                            done_bytes=int(total_weight * fraction()),
+                            total_bytes=int(total_weight),
+                            current=current, stage=stage))
+
+        def on_trash(result: dict) -> None:
+            nonlocal trash_done
             uid = result.get("uid", "")
             if result.get("ok"):
-                gained += weight.get(uid, 1.0) * share
-                if collect:
-                    trashed.append(uid)
+                trash_done += 1
+                trashed.add(uid)
             else:
-                message = (result.get("error") or {}).get("message") or "unknown error"
-                failures.append((names.get(uid, uid), message))
-            if counts_done:
-                done += 1
+                failures.append((names.get(uid, uid),
+                                 (result.get("error") or {}).get("message") or "unknown error"))
             emit(names.get(uid, uid))
 
-        cancelled = False
         try:
             for chunk in _chunks(photos, CHUNK):
-                self._node_command("trash", [f"/photos/{p.path}" for p in chunk], cancel,
-                                   lambda r: handle(r, 0.5 if permanent else 1.0, not permanent, True))
+                self._node_command("trash", [f"/photos/{p.path}" for p in chunk], cancel, on_trash)
+
             if permanent and trashed:
-                report(Progress(done, total, int(gained), int(total_weight), stage="empty_trash"))
-                nodes = self._trash_nodes(cancel)
-                by_uid = {n.get("uid"): n for n in nodes}
-                counts = Counter(self._node_name(n) for n in nodes)
-                targets: list[str] = []
-                for uid in trashed:
-                    node = by_uid.get(uid)
-                    if node is None:
-                        done += 1
-                        gained += weight.get(uid, 1.0) * 0.5
-                        continue
-                    name = self._node_name(node)
-                    if counts[name] > 1:
-                        failures.append((name, "Duplicate name in the Photos trash; skipped to avoid "
-                                               "deleting a different item. Delete it manually."))
-                        done += 1
-                        gained += weight.get(uid, 1.0) * 0.5
-                        emit(name)
-                        continue
-                    targets.append("/photos-trash/" + name.replace("/", "\\/"))
-                for chunk in _chunks(targets, CHUNK):
-                    self._node_command("delete", chunk, cancel, lambda r: handle(r, 0.5, True, False))
+                emit(stage="empty_trash")
+                blocked: set[str] = set()
+                while True:
+                    if cancel.is_set():
+                        raise Cancelled()
+                    groups: dict[str, list[str]] = {}
+                    for node in self._trash_nodes(cancel):
+                        groups.setdefault(self._node_name(node), []).append(node.get("uid", ""))
+                    remaining = {uid for uids in groups.values() for uid in uids if uid in trashed}
+                    deleted = len(trashed) - len(remaining)
+                    emit(stage="empty_trash")
+
+                    # One delete per name per pass: the CLI resolves a name to a single node.
+                    pending = []
+                    for name, uids in groups.items():
+                        ours = [uid for uid in uids if uid in trashed]
+                        if not ours:
+                            continue
+                        if len(ours) == len(uids):
+                            pending.append(name)      # every copy is ours -> safe
+                        else:
+                            blocked.update(ours)      # a foreign item shares this name
+                    if not pending:
+                        break
+
+                    removed = 0
+
+                    def on_delete(result: dict) -> None:
+                        nonlocal removed
+                        if result.get("ok"):
+                            removed += 1
+
+                    for chunk in _chunks(sorted(pending), CHUNK):
+                        paths = ["/photos-trash/" + name.replace("/", "\\/") for name in chunk]
+                        try:
+                            self._node_command("delete", paths, cancel, on_delete)
+                        except AppError as exc:
+                            self._log.append(f"delete pass failed: {exc}")
+                    if removed == 0:
+                        break                          # no progress, avoid looping forever
+
+                left = {node.get("uid", "") for node in self._trash_nodes(cancel)} & trashed
+                deleted = len(trashed) - len(left)
+                for uid in left:
+                    reason = ("Another item with the same name is in the Photos trash and is not part "
+                              "of this operation; delete it manually to avoid removing the wrong file."
+                              if uid in blocked else
+                              "Could not be permanently deleted; empty the Photos trash manually.")
+                    failures.append((names.get(uid, uid), reason))
+                emit(stage="empty_trash")
         except Cancelled:
             cancelled = True
+        except AppError as exc:
+            warning_key, warning_debug = "error.permanent_failed", str(exc)
+
         emit()
-        return BatchResult("permanent" if permanent else "trash", total, done,
-                           int(total_weight), int(gained), failures, cancelled)
+        result = BatchResult("permanent" if permanent else "trash", total,
+                             deleted if permanent else trash_done,
+                             int(total_weight), int(total_weight * fraction()),
+                             failures, cancelled)
+        result.warning_key, result.warning_debug = warning_key, warning_debug
+        return result
 
     # ----------------------------------------------------------------- find binary by architecture
     @staticmethod
