@@ -6,4 +6,4 @@ Exec=neutron-migrator
 Icon=neutron-migrator
 Categories=Utility;FileTransfer;
 Terminal=false
-StartupWMClass=Neutron Migrator
+StartupWMClass=neutron-migrator

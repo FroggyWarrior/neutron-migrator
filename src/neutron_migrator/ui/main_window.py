@@ -12,6 +12,9 @@ from .widgets import label
 class MainWindow(QMainWindow):
     def __init__(self, ctx):
         super().__init__()
+        from PySide6.QtGui import QIcon
+        from ..config import app_icon_path
+        self.setWindowIcon(QIcon(str(app_icon_path())))
         self.ctx = ctx
         ctx.go = self.go
         self.setMinimumSize(720, 620)

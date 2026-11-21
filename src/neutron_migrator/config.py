@@ -80,3 +80,12 @@ class Settings:
             os.chmod(self._path, 0o600)  # file: no execute bit needed
         except OSError:
             pass
+
+def app_icon_path() -> Path:
+    """Icon used for the window, taskbar and dock."""
+    preferred = "icon.ico" if os.name == "nt" else "icon.png"
+    for candidate in (asset("icons", preferred), asset("icons", "icon.png"),
+                      Path(__file__).resolve().parents[2] / "packaging" / "icons" / "icon.png"):
+        if candidate.exists():
+            return candidate
+    return asset("icons", "icon.png")
