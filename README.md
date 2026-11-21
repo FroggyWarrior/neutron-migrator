@@ -154,8 +154,10 @@ Prebuilt binaries are on the [Releases page](https://github.com/FroggyWarrior/ne
 
 Additional runtime requirements:
 
-- **Linux:** `libsecret` and a running Secret Service (GNOME Keyring or KWallet).
-  On Arch: `sudo pacman -S libsecret gnome-keyring` (or `kwallet`).
+- **Linux:** `libsecret` plus a running Secret Service (GNOME Keyring / KWallet).
+  Release binaries bundle the Qt `xcb` libraries; if you run from source on
+  Debian/Ubuntu/Mint you also need `libxcb-cursor0`. Never run the app with `sudo`:
+  root has no keyring session and sign-in would fail.
 - **All platforms:** a default browser for sign-in, and enough free disk space for
   downloads.
 - **macOS:** builds are unsigned/un-notarized; the first launch requires

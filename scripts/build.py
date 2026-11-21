@@ -36,6 +36,45 @@ EXCLUDES = [
 ]
 
 
+LINUX_XCB_LIBS = [
+    "xcb-cursor", "xcb-icccm", "xcb-image", "xcb-keysyms", "xcb-randr",
+    "xcb-render-util", "xcb-shape", "xcb-xinerama", "xcb-xkb", "xkbcommon-x11",
+    "xcb-util",
+]
+
+
+def linux_runtime_libs() -> list[Path]:
+    """Resolve the xcb/xkb system libraries Qt's platform plugin needs at runtime."""
+    import ctypes.util
+    cache = ""
+    for tool in ("/sbin/ldconfig", "ldconfig"):
+        try:
+            cache = subprocess.run([tool, "-p"], capture_output=True, text=True).stdout
+            break
+        except OSError:
+            continue
+    found: list[Path] = []
+    for name in LINUX_XCB_LIBS:
+        soname = ctypes.util.find_library(name)
+        if not soname:
+            continue
+        path = None
+        for line in cache.splitlines():
+            if line.strip().startswith(soname + " ") and "=>" in line:
+                path = Path(line.split("=>")[-1].strip())
+                break
+        if path is None or not path.exists():
+            for folder in ("/usr/lib/x86_64-linux-gnu", "/usr/lib/aarch64-linux-gnu",
+                           "/usr/lib64", "/usr/lib", "/lib/x86_64-linux-gnu"):
+                candidate = Path(folder) / soname
+                if candidate.exists():
+                    path = candidate
+                    break
+        if path and path.exists():
+            found.append(path)
+    return found
+
+
 def host_tag() -> str:
     machine = platform.machine().lower()
     arch = {"amd64": "x64", "x86_64": "x64", "arm64": "arm64", "aarch64": "arm64"}.get(machine, machine)
@@ -93,8 +132,10 @@ def main() -> None:
     ]
     for binary in binaries:
         cmd += ["--add-binary", f"{binary}{SEP}."]
-    for binary in binaries:
-        cmd += ["--add-binary", f"{binary}{SEP}."]
+    if sys.platform == "linux":
+        for lib in linux_runtime_libs():
+            cmd += ["--add-binary", f"{lib}{SEP}."]
+            print(f"  bundling: {lib.name}")
     licenses = ROOT / "THIRD_PARTY_LICENSES"
     if licenses.is_dir():
         cmd += ["--add-data", f"{licenses}{SEP}THIRD_PARTY_LICENSES"]

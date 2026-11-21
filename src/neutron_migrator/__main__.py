@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import traceback
+import subprocess
 
 from PySide6.QtWidgets import QApplication
 
@@ -17,7 +18,45 @@ from .ui.widgets import show_error
 from PySide6.QtGui import QIcon
 
 
+def _prepare_linux_qpa() -> None:
+    """Qt's xcb plugin needs libxcb-cursor & friends; use bundled copies if absent."""
+    if not sys.platform.startswith("linux"):
+        return
+    import ctypes
+    import ctypes.util
+    from pathlib import Path
+
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    for name in ("xcb-util", "xcb-cursor", "xcb-icccm", "xcb-image", "xcb-keysyms",
+                 "xcb-randr", "xcb-render-util", "xcb-shape", "xcb-xinerama",
+                 "xcb-xkb", "xkbcommon-x11"):
+        if ctypes.util.find_library(name):
+            continue
+        for candidate in sorted(base.glob(f"lib{name}.so.*")):
+            try:
+                ctypes.CDLL(str(candidate), mode=ctypes.RTLD_GLOBAL)
+                break
+            except OSError:
+                continue
+    try:
+        ctypes.CDLL("libxcb-cursor.so.0", mode=ctypes.RTLD_GLOBAL)
+    except OSError:
+        message = ("Missing system library: libxcb-cursor.so.0\n"
+                   "Debian/Ubuntu/Mint: sudo apt install libxcb-cursor0\n"
+                   "Fedora: sudo dnf install xcb-util-cursor\n"
+                   "Arch: sudo pacman -S xcb-util-cursor\n")
+        sys.stderr.write(message)
+        for tool in (["zenity", "--error", "--text"], ["kdialog", "--error"], ["xmessage"]):
+            try:
+                subprocess.run(tool + [message], check=False)
+                break
+            except OSError:
+                continue
+        sys.exit(1)
+
+
 def main() -> None:
+    _prepare_linux_qpa()
     if sys.platform == "win32":
         try:
             import ctypes

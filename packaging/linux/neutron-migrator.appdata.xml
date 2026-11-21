@@ -21,7 +21,7 @@
   <url type="bugtracker">https://github.com/FroggyWarrior/neutron-migrator/issues</url>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="1.0.5" date="2026-11-22">
+    <release version="1.0.6" date="2026-11-22">
       <description>
         <p>Permanent deletion now handles duplicate filenames correctly. The application icon appears in the Windows taskbar and the Linux dock. Documentation clarifies which telemetry the bundled Proton CLI reports.</p>
       </description>
