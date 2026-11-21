@@ -17,6 +17,15 @@ Sign-in happens in your browser through the **official Proton Drive CLI** (bundl
 
 macOS builds are unsigned: right-click → **Open** the first time.
 
+### What's new in 1.0.3
+
+- Fixed a crash on Windows when clicking **Open browser** / **Copy link** during sign-in.
+- Download progress now shows real transfer speed and estimated time remaining.
+- New option to **include videos** from the photo timeline (excluded by default), which
+  explains large differences between the scanned total and your library size.
+- Items without size metadata are now counted and reported instead of silently counted as 0.
+- Cleaner debug logs: remote paths are summarised instead of dumping hundreds of identifiers.
+
 ### Features
 
 - Browser sign-in; session stored in the OS keychain.

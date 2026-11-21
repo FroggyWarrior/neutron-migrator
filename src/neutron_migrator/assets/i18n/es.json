@@ -122,5 +122,7 @@
   "home.account_fallback": "tu cuenta de Proton",
   "action.include_videos": "Incluir los vídeos de la línea de tiempo",
   "action.unknown_sizes": "{count} elementos no informan de su tamaño; el total mostrado es un mínimo.",
-  "action.videos_skipped": "Se excluyen {count} vídeos ({size}). Marca la casilla de arriba para incluirlos."
+  "action.videos_skipped": "Se excluyen {count} vídeos ({size}). Marca la casilla de arriba para incluirlos.",
+  "progress.retrying": "Problema de conexión. Esperando y reintentando…",
+  "result.retry_failed": "Reintentar {count} fallidos"
 }

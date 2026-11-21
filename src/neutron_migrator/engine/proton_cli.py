@@ -22,7 +22,12 @@ from ..errors import AppError, Cancelled
 from .base import BatchResult, Photo, Progress, ScanResult, is_photo, is_video
 
 BINARY = "proton-drive.exe" if os.name == "nt" else "proton-drive"
-CHUNK = 40          # keeps argv well below the Windows 32k limit
+CHUNK = 100 if os.name == "nt" else 200
+NETWORK_MARKERS = (
+    "enotfound", "eai_again", "getaddrinfo", "econnreset", "econnrefused",
+    "etimedout", "econnaborted", "socket hang up", "network", "epipe",
+    "429", "too many requests", "502", "503", "504",
+)
 POLL = 0.4
 
 
@@ -367,9 +372,11 @@ class ProtonCliEngine:
         total, total_bytes = len(photos), sum(p.size for p in photos)
         done = skipped = transferred = 0
         failures: list[tuple[str, str]] = []
+        retry_photos: list[Photo] = []
         cancelled = False
         history: deque[tuple[float, int]] = deque(maxlen=64)
         last_walk = [0.0, float(base_bytes)]
+        waiting = [False]
 
         def tick() -> None:
             now = time.monotonic()
@@ -390,48 +397,69 @@ class ProtonCliEngine:
             remaining = max(0.0, total_bytes - shown)
             report(Progress(done_files=min(done + skipped, total), total_files=total,
                             done_bytes=int(shown), total_bytes=total_bytes,
-                            speed=speed, eta=(remaining / speed) if speed > 0 else None))
+                            speed=speed, eta=(remaining / speed) if speed > 0 else None,
+                            stage="waiting" if waiting[0] else ""))
 
         try:
             for chunk in _chunks(photos, CHUNK):
                 if cancel.is_set():
                     raise Cancelled()
-                summary: dict = {}
-
-                def on_line(line: str) -> None:
-                    data = self._parse_item(line)
-                    if isinstance(data, dict) and "transferredItems" in data:
-                        summary.update(data)
-                    else:
-                        self._log.append(line)
-
+                waiting[0] = False
                 args = ["photo", "download", *[f"/photos/{p.path}" for p in chunk], str(dest),
                         "--json", "--conflict-strategy", "rename"]
-                code = self._stream(args, cancel, on_line, on_tick=tick, timeout=14400)
+                waiting[0] = True
+                summary, error = self._run_batch(args, cancel, tick)
+                waiting[0] = False
                 if summary:
                     done += int(summary.get("transferredItems", 0))
                     skipped += int(summary.get("skippedItems", 0))
                     transferred += int(summary.get("transferredBytes", 0))
-                    failures += [(f.get("name", "?"), str(f.get("error", ""))) for f in summary.get("failures", [])]
-                elif code != 0:
-                    raise AppError("error.download_failed", debug=f"photo download exit={code}\n{self.log_tail(100)}")
+                    bad = set()
+                    for item in summary.get("failures", []):
+                        name = item.get("name", "?")
+                        bad.add(name)
+                        failures.append((name, str(item.get("error", ""))))
+                    retry_photos += [p for p in chunk if p.name in bad]
+                else:
+                    for photo in chunk:
+                        failures.append((photo.name or photo.path, error[:300] or "batch failed"))
+                    retry_photos += list(chunk)
                 tick()
         except Cancelled:
             cancelled = True
-        return BatchResult("download", total, min(done + skipped, total), total_bytes,
-                           transferred, failures, cancelled)
 
-    def _node_command(self, command: str, paths: list[str], cancel, on_result) -> None:
-        def on_line(line: str) -> None:
-            data = self._parse_item(line)
-            if isinstance(data, dict) and "uid" in data:
-                on_result(data)
-            else:
-                self._log.append(line)
+        result = BatchResult("download", total, min(done + skipped, total), total_bytes,
+                             transferred, failures, cancelled)
+        result.retry_photos = retry_photos
+        if not cancelled and done == 0 and retry_photos and self._is_network_error(self.log_tail(60)):
+            result.warning_key = "error.network"
+            result.warning_debug = self.log_tail(60)
+        return result
 
-        code = self._stream(["filesystem", command, *paths, "--json"], cancel, on_line, timeout=3600)
-        if code != 0:
-            raise AppError("error.delete_failed", debug=f"filesystem {command} exit={code}\n{self.log_tail(100)}")
+    def _node_command(self, command: str, paths: list[str], cancel, on_result, attempts: int = 4) -> None:
+        delay = 3.0
+        for attempt in range(attempts):
+            if cancel.is_set():
+                raise Cancelled()
+            seen: list[dict] = []
+
+            def on_line(line: str) -> None:
+                data = self._parse_item(line)
+                if isinstance(data, dict) and "uid" in data:
+                    seen.append(data)
+                    on_result(data)
+                else:
+                    self._log.append(line)
+
+            code = self._stream(["filesystem", command, *paths, "--json"], cancel, on_line, timeout=3600)
+            if code == 0 or seen:
+                return
+            if attempt + 1 < attempts and self._is_network_error(self.log_tail(40)):
+                self._sleep(delay, cancel)
+                delay = min(delay * 3, 60.0)
+                continue
+            raise AppError("error.delete_failed",
+                           debug=f"filesystem {command} exit={code}\n{self.log_tail(80)}")
 
     def _trash_nodes(self, cancel) -> list[dict]:
         nodes: list[dict] = []
@@ -535,3 +563,44 @@ class ProtonCliEngine:
             if found:
                 return Path(found)
         raise AppError("error.cli_missing", debug=f"Searched {roots} for {self._cli_filenames()}")
+
+    # ----------------------------------------------------------------- network
+    @staticmethod
+    def _is_network_error(text: str) -> bool:
+        low = text.lower()
+        return any(marker in low for marker in NETWORK_MARKERS)
+
+    @staticmethod
+    def _sleep(seconds: float, cancel) -> None:
+        waited = 0.0
+        while waited < seconds:
+            if cancel is not None and cancel.is_set():
+                raise Cancelled()
+            time.sleep(0.5)
+            waited += 0.5
+
+    def _run_batch(self, args, cancel, on_tick, attempts: int = 4):
+        """Run one download batch with retries. Returns (summary, error_text)."""
+        delay = 3.0
+        error = ""
+        for attempt in range(attempts):
+            if cancel.is_set():
+                raise Cancelled()
+            summary: dict = {}
+
+            def on_line(line: str) -> None:
+                data = self._parse_item(line)
+                if isinstance(data, dict) and "transferredItems" in data:
+                    summary.update(data)
+                else:
+                    self._log.append(line)
+
+            code = self._stream(args, cancel, on_line, on_tick=on_tick, timeout=14400)
+            if summary:
+                return summary, ""          # includes per-item failures reported by the CLI
+            error = self.log_tail(30) or f"exit={code}"
+            if attempt + 1 < attempts:
+                self._log.append(f"batch failed (attempt {attempt + 1}); retrying in {delay:.0f}s")
+                self._sleep(delay, cancel)
+                delay = min(delay * 3, 60.0)
+        return {}, error

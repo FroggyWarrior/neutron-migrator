@@ -508,6 +508,9 @@ class ProgressScreen(Screen):
     def _progress(self, p) -> None:
         if p.stage == "empty_trash":
             self.i18n.bind(self.title, "progress.emptying")
+        if p.stage == "waiting":
+            self.i18n.bind(self.current, "progress.retrying")
+            return
         if p.total_bytes:
             ratio = p.done_bytes / p.total_bytes
         elif p.total_files:
@@ -584,6 +587,12 @@ class ResultScreen(Screen):
             open_btn = button(self.i18n, "result.open_folder")
             open_btn.clicked.connect(lambda: open_folder(destination))
             footer.addWidget(open_btn)
+        retry = getattr(result, "retry_photos", [])
+        if retry and result.kind == "download":
+            retry_btn = button(self.i18n, "result.retry_failed", count=len(retry))
+            retry_btn.clicked.connect(lambda: ctx.go("progress", kind="download", photos=retry,
+                                                     destination=destination, mode="trash"))
+            footer.addWidget(retry_btn)
         footer.addStretch(1)
         footer.addWidget(back)
         self.root.addLayout(footer)

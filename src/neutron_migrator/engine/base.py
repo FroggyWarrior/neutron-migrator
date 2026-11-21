@@ -70,3 +70,4 @@ class BatchResult:
     cancelled: bool = False
     warning_key: str = ""
     warning_debug: str = ""
+    retry_photos: list = field(default_factory=list)
