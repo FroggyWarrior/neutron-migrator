@@ -78,7 +78,7 @@ fi
 
 # --- build -------------------------------------------------------------------
 # --appimage-extract-and-run avoids needing FUSE (CI containers, restricted hosts).
-ARCH="$ARCH" "$TOOL" --appimage-extract-and-run "$APPDIR" "$OUT"
+ARCH="$ARCH" "$TOOL" --appimage-extract-and-run --no-appstream "$APPDIR" "$OUT"
 
 chmod +x "$OUT"
 echo "AppImage ready: $OUT ($(du -h "$OUT" | cut -f1))"

@@ -5,24 +5,27 @@
   <project_license>GPL-3.0-only</project_license>
   <name>Neutron Migrator</name>
   <summary>Download or delete all your Proton Drive photos</summary>
+  <developer_name>FroggyWarrior</developer_name>
   <description>
-    <p>
-      Neutron Migrator scans your Proton Drive photo timeline, shows how many photos
-      and how much space they take, and then downloads them to a folder you choose or
-      deletes them (to the trash or permanently). Sign-in happens in your browser
-      through the official Proton Drive CLI.
-    </p>
+    <p>Neutron Migrator scans your Proton Drive photo timeline, shows how many photos and how much space they take, and then downloads them to a folder you choose or deletes them, either to the trash or permanently.</p>
+    <p>Sign-in happens in your browser through the official Proton Drive CLI, so passwords, two-factor codes and security keys never touch this application.</p>
     <p>This is a third-party application, not officially supported by Proton AG.</p>
   </description>
   <launchable type="desktop-id">neutron-migrator.desktop</launchable>
-  <developer id="me.froggywarrior">
-    <name>FroggyWarrior</name>
-  </developer>
+  <icon type="stock">neutron-migrator</icon>
+  <categories>
+    <category>Utility</category>
+    <category>FileTransfer</category>
+  </categories>
   <url type="homepage">https://github.com/FroggyWarrior/neutron-migrator</url>
   <url type="bugtracker">https://github.com/FroggyWarrior/neutron-migrator/issues</url>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="1.0.5" date="2026-11-21"/>
+    <release version="1.0.5" date="2026-11-22">
+      <description>
+        <p>Permanent deletion now handles duplicate filenames correctly. The application icon appears in the Windows taskbar and the Linux dock. Documentation clarifies which telemetry the bundled Proton CLI reports.</p>
+      </description>
+    </release>
   </releases>
   <provides>
     <binary>neutron-migrator</binary>
