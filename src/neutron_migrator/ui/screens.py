@@ -83,6 +83,9 @@ class LoginScreen(Screen):
         lay.addLayout(buttons)
         self.root.addWidget(frame)
         self.root.addStretch(1)
+        self.ai_note = label(self.i18n, "about.ai_assisted", "fineprint", wrap=True)
+        self.ai_note.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.root.addWidget(self.ai_note)
 
         self.i18n.bind(self.status, "login.starting")
         self.signin.setEnabled(False)
