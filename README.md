@@ -77,6 +77,111 @@ button.
 - **Honest errors**: every failure shows a readable message plus a *Show more* panel
   with copyable, secret-redacted debug information (always in English).
 
+## Use cases
+
+Neutron Migrator moves the **photo timeline** of a Proton account to a local folder, and
+optionally removes it from the cloud afterwards. That makes it useful for:
+
+- **Proton → Proton.** Moving photos between accounts (personal → family, splitting a
+  shared account, leaving an old address). Download while signed in as account A, sign
+  out, sign in as B, then upload with Proton's own tools
+  (`proton-drive photo upload --help`, or the mobile/desktop app).
+- **Proton → somewhere else.** Export the whole library once, then import it into a
+  different provider with that provider's own client. See
+  [alternatives](#open-source-end-to-end-encrypted-alternatives) below.
+- **Offline backup (3-2-1).** Keep a local copy on your disk or NAS while staying on
+  Proton. Nothing is deleted unless you explicitly choose to.
+- **Reclaiming space.** Download everything, verify the copy, then move the cloud side to
+  the trash — recoverable — and only later delete permanently.
+
+It does **not** touch Mail, Calendar, Contacts, Pass, Docs or VPN, and it does not upload
+anything: it is an export-and-cleanup tool, not a sync client.
+
+### Why stay in Proton
+
+- **End-to-end encryption by default** across Drive, Photos, Mail, Calendar and Pass, with
+  zero-access encryption on the server side. No ads, no data selling; the business model
+  is subscriptions.
+- **One account, one bill** for mail, calendar, storage, password manager, aliases, VPN,
+  docs and 2FA. If you use several of them, the bundle is hard to beat on price and
+  convenience.
+- **Swiss jurisdiction** with GDPR alignment, and a long public track record of fighting
+  legal requests rather than quietly complying.
+- **Open-source clients and published audits**, plus — since 2026 — an official
+  [Drive SDK and CLI](https://github.com/ProtonDriveApps/sdk) that makes automation
+  possible at all. This application exists because of that.
+- **A mature mail ecosystem**: custom domains, catch-all, aliases, IMAP/SMTP via Bridge,
+  and desktop/mobile clients that work today.
+- **Photos that just work** on mobile: automatic backup, albums, sharing, all encrypted.
+- **Recovery options** (recovery phrase, recovery file, recovery email) that mitigate the
+  main risk of zero-knowledge storage: forgetting your password.
+
+### Why leave Proton
+
+Not a recommendation — just the reasons people actually cite. Portability cuts both ways,
+and this tool is meant to make either direction easy.
+
+- **All your eggs in one basket.** A single account holds your mail, calendar, contacts,
+  files, photos, passwords, 2FA seeds and VPN. A suspension, a billing failure, a
+  compromised password or a locked account takes *everything* down at once. An offline
+  export is cheap insurance, whatever you decide.
+- **Zero-knowledge also means zero rescue.** Lose the password without a working recovery
+  method and the data is gone; support cannot decrypt it for you.
+- **"Open source" means the clients, not the service.** The server side is proprietary.
+  The Drive SDK/CLI was only published in 2026 and its own README still says it is *not
+  ready for third-party production use*, with a breaking cryptographic migration
+  announced for end-2026/early-2027 that will stop older clients from interoperating.
+- **No standard access protocols.** There is no WebDAV, no S3 endpoint, no official rclone
+  backend. Automation depends entirely on Proton's own CLI, which is why a wrapper like
+  this one is needed in the first place.
+- **Linux is a second-class citizen.** There is still no official Proton Drive desktop
+  app for Linux — announced, but unavailable; the CLI only arrived in June 2026. Mail has
+  no official desktop client either (Bridge is mail-only). Proton VPN, to be fair, does
+  ship a proper Linux app.
+- **Breadth over depth** (community perception, not a measurable fact): Pass, Docs,
+  Sheets, Wallet, Authenticator, Lumo and Meet have shipped while long-standing Drive
+  requests — a Linux client, selective sync, better photo tooling — keep waiting.
+- **Leadership and the AI push.** A [404 Media investigation](https://www.404media.co/manifestos-fear-and-loser-thinking-inside-protons-ai-reckoning/)
+  reported internal messages in which CEO Andy Yen told engineers to "stop lovingly
+  handcrafting all our code", dismissed security objections as "loser thinking", and pushed
+  to skip penetration testing in favour of "AI velocity", alongside plans to re-interview
+  staff about their AI use with implications for their jobs; employees described a culture
+  where raising security concerns was discouraged. After user backlash and subscription
+  cancellations, Proton **cancelled those re-interviews and apologised**, stating that "AI
+  will never be at the expense of security" — while keeping the shift towards AI-assisted
+  development, with CTO Bart Butler arguing that "programming is dead, but engineering is
+  not". For a company whose product is trust, that episode is a reason to keep your own
+  copies regardless of where you store them.
+
+### Open-source, end-to-end encrypted alternatives
+
+All of these publish their source code and encrypt on the client. Licences, quotas and
+features change: check the repositories before committing. **None of them import from
+Proton directly** — export here, then upload with the destination's own client, and
+verify a small batch before deleting anything.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **[Ente Photos](https://ente.io)** | The closest match for this tool's use case: photo/video-first, E2EE, client **and** server open source (AGPL), albums, on-device face/object search, desktop apps for Linux/Windows/macOS, mobile auto-backup, self-hostable | Photos and videos only — not a general-purpose file drive; smaller company; self-hosting needs Postgres + object storage |
+| **[Filen](https://filen.io)** | E2EE (AES-256-GCM), real sync clients including Linux, WebDAV and S3 gateways, mobile photo backup, German/EU jurisdiction | Clients are open source but the server code is not published; no dedicated photos app with albums; smaller ecosystem |
+| **[Internxt](https://internxt.com)** | E2EE with post-quantum key exchange, client and server code published, Drive + Send + Mail + VPN bundle, EU jurisdiction | Long-standing complaints about speed and reliability; aggressive lifetime-plan marketing; Linux desktop support has lagged behind (CLI available) |
+| **[Seafile](https://www.seafile.com)** | Very mature self-hosted sync, per-library E2EE, excellent Linux clients, handles large libraries well | ⚠️ Encrypted libraries are second-class: no web preview or search, and **mobile auto-backup cannot upload into them** — good as a migration target, not as an E2EE phone backup; you run and maintain the server |
+| **[Peergos](https://peergos.org)** | E2EE, peer-to-peer, fully open source, self-hostable, no central storage provider | Small project, fewer clients and integrations, slower photo workflows |
+| **[Syncthing](https://syncthing.net/)** | Similar to Peergos, as it's E2EE, peer-to-peer, fully open source, self-hostable, no central storage provider | ⚠️ No photo backups, just folder sync |
+| **[Cryptomator](https://cryptomator.org) + any storage** | Keep your existing cloud/NAS and add an audited E2EE vault on top; open source, cross-platform; no migration of provider needed | No photo app, albums or auto-backup; you manage sync yourself; large libraries mean many encrypted files |
+| **[MEGA](https://mega.io)** | E2EE, generous free tier, native Linux clients, source code published | ⚠️ Its published code uses a **custom, restrictive licence, not an OSI-approved one**, and the server is proprietary — so it only half-meets the "open source" bar. Included because people ask about it |
+
+Two different bars: **all** of the above work as a destination for the photos you export
+here (you upload from the desktop). If you also want **automatic, end-to-end encrypted
+backup from your phone** afterwards, only Ente, Filen and Internxt offer that today —
+verify before committing, since these apps change fast.
+
+Excluded on purpose: Tresorit, pCloud, Sync.com, Icedrive and Koofr are not open source;
+Immich is excellent and open source but **not** end-to-end encrypted (the server sees your
+photos); **Nextcloud** has E2EE only as an opt-in, experimental per-folder feature, and its
+mobile auto-upload does not target encrypted folders — so your photo backup would not be
+zero-knowledge.
+
 ## How it works
 
 ```
