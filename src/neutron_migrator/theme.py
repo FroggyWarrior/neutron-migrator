@@ -9,7 +9,7 @@ from .config import asset
 
 
 class ThemeManager(QObject):
-    def __init__(self, app: QGuiApplication, mode: str = "dark"):
+    def __init__(self, app: QGuiApplication, mode: str = "system"):
         super().__init__()
         self.app, self.mode = app, mode
         self._palettes = json.loads(asset("themes", "palettes.json").read_text("utf-8"))
@@ -20,7 +20,7 @@ class ThemeManager(QObject):
         self.apply()
 
     def set_mode(self, mode: str) -> None:
-        self.mode = mode if mode in ("dark", "light", "system") else "dark"
+        self.mode = mode if mode in ("dark", "light", "system") else "system"
         self.apply()
 
     def effective(self) -> str:

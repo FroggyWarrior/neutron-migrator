@@ -72,7 +72,7 @@ button.
 - **Two deletion modes**: move to trash, or permanent deletion of *only* the selected
   photos (items with duplicate names in the Photos trash are skipped and reported).
 - **English / Spanish** UI, switchable at runtime; **dark / light / system** theme
-  (defaults: English + dark). All strings live in JSON files, so new languages are
+  (defaults: English + system theme). All strings live in JSON files, so new languages are
   drop-in.
 - **Honest errors**: every failure shows a readable message plus a *Show more* panel
   with copyable, secret-redacted debug information (always in English).

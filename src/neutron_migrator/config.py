@@ -42,7 +42,7 @@ def data_dir() -> Path:
 @dataclass
 class Settings:
     language: str = "en"            # en | es | ...
-    theme: str = "dark"             # dark | light | system
+    theme: str = "system"          # dark | light | system
     keep_session: bool = False
     concurrency: int = 4
     delete_mode: str = "trash"      # trash | permanent
@@ -68,7 +68,7 @@ class Settings:
                 setattr(settings, key, value)
         settings.concurrency = max(1, min(8, settings.concurrency))
         if settings.theme not in ("dark", "light", "system"):
-            settings.theme = "dark"
+            settings.theme = "system"
         if settings.delete_mode not in ("trash", "permanent"):
             settings.delete_mode = "trash"
         return settings
