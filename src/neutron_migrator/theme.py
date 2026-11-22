@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from PySide6.QtCore import QObject, Qt
 from PySide6.QtGui import QGuiApplication, QPalette
@@ -42,4 +43,6 @@ class ThemeManager(QObject):
         qss = self._qss
         for token, value in palette.items():
             qss = qss.replace("{{" + token + "}}", value)
+        # Leftover {{tokens}} would inject literal braces and break the whole sheet.
+        qss = re.sub(r"\{\{[A-Za-z0-9_]+\}\}", palette.get("muted", "#888888"), qss)
         self.app.setStyleSheet(qss)

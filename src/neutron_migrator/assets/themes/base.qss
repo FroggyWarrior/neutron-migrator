@@ -3,6 +3,7 @@ QLabel, QCheckBox, QRadioButton { background: transparent; }
 QLabel#h1 { font-size: 23px; font-weight: 700; }
 QLabel#h2 { font-size: 16px; font-weight: 600; }
 QLabel#muted { color: {{muted}}; font-size: 13px; }
+QLabel#fineprint { color: {{faint}}; font-size: 11px; }
 QLabel#warning { color: {{warning}}; font-size: 13px; }
 QWidget#header { background: {{bg}}; border-bottom: 1px solid {{border}}; }
 QFrame#card { background: {{surface}}; border: 1px solid {{border}}; border-radius: 14px; }
