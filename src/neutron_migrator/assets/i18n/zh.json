@@ -125,5 +125,6 @@
   "error.delete_failed": "删除未能完成。",
   "error.timeout": "操作超时。",
   "error.generic": "意外错误：{message}",
-  "about.ai_assisted": "在 AI 辅助下开发，并由真人实际运行测试。本应用不含 AI，也绝不会把您的数据发送给任何 AI 服务。"
+  "about.ai_assisted": "在 AI 辅助下开发，并由真人实际运行测试。本应用不含 AI，也绝不会把您的数据发送给任何 AI 服务。",
+  "language.system": "跟随系统"
 }

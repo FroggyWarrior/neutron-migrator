@@ -27,9 +27,15 @@ class ThemeManager(QObject):
         if self.mode != "system":
             return self.mode
         hints = QGuiApplication.styleHints()
-        if hasattr(hints, "colorScheme"):
-            return "dark" if hints.colorScheme() == Qt.ColorScheme.Dark else "light"
-        return "dark" if QGuiApplication.palette().color(QPalette.ColorRole.Window).lightness() < 128 else "light"
+        try:
+            scheme = hints.colorScheme()
+        except AttributeError:
+            scheme = None
+        if scheme == Qt.ColorScheme.Dark:
+            return "dark"
+        if scheme == Qt.ColorScheme.Light:
+            return "light"
+        return "dark"          # unknown / unsupported -> dark
 
     def apply(self) -> None:
         palette = self._palettes[self.effective()]

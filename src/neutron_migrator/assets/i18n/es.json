@@ -125,5 +125,6 @@
   "action.videos_skipped": "Se excluyen {count} vídeos ({size}). Marca la casilla de arriba para incluirlos.",
   "progress.retrying": "Problema de conexión. Esperando y reintentando…",
   "result.retry_failed": "Reintentar {count} fallidos",
-  "about.ai_assisted": "Desarrollado con asistencia de IA y probado por una persona. Esta app no contiene IA y nunca envía tus datos a servicios de IA."
+  "about.ai_assisted": "Desarrollado con asistencia de IA y probado por una persona. Esta app no contiene IA y nunca envía tus datos a servicios de IA.",
+  "language.system": "Sistema"
 }

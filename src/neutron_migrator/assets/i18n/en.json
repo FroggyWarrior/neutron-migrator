@@ -125,5 +125,6 @@
   "action.videos_skipped": "{count} videos ({size}) are excluded. Tick the box above to include them.",
   "progress.retrying": "Connection problem. Waiting and retrying…",
   "result.retry_failed": "Retry {count} failed",
-  "about.ai_assisted": "Developed with AI assistance and tested by a human. This app contains no AI and never sends your data to AI services."
+  "about.ai_assisted": "Developed with AI assistance and tested by a human. This app contains no AI and never sends your data to AI services.",
+  "language.system": "System"
 }

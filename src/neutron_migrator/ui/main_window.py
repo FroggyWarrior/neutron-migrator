@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
                                QStackedWidget, QVBoxLayout, QWidget)
 
@@ -44,6 +44,7 @@ class MainWindow(QMainWindow):
         head.addWidget(self.theme_box)
         head.addWidget(label(ctx.i18n, "header.language", "muted"))
         self.lang_box = QComboBox()
+        self.lang_box.addItem(ctx.i18n.display_name("system"), "system")
         for lang in ctx.i18n.available():
             self.lang_box.addItem(ctx.i18n.display_name(lang), lang)
         self.lang_box.setCurrentIndex(max(0, self.lang_box.findData(ctx.settings.language)))
@@ -90,14 +91,23 @@ class MainWindow(QMainWindow):
 
     def _retranslate(self) -> None:
         self.setWindowTitle(f"{__app_name__} — {__developer__}")
-        for box, values in ((self.theme_box, [("theme.dark", "dark"), ("theme.light", "light"), ("theme.system", "system")]),
-                            (self.lang_box, [(None, lang) for lang in self.ctx.i18n.available()])):
+        themes = [("theme.dark", "dark"), ("theme.light", "light"), ("theme.system", "system")]
+        languages = [(None, "system")] + [(None, lang) for lang in self.ctx.i18n.available()]
+        for box, values in ((self.theme_box, themes), (self.lang_box, languages)):
             current = box.currentData()
             box.blockSignals(True)
             for index, (key, data) in enumerate(values):
-                box.setItemText(index, self.ctx.i18n.t(key) if key else self.ctx.i18n.display_name(data))
+                box.setItemText(index, self.ctx.i18n.t(key) if key
+                                else self.ctx.i18n.display_name(data))
             box.setCurrentIndex(max(0, box.findData(current)))
             box.blockSignals(False)
+
+    def changeEvent(self, event) -> None:  # noqa: N802
+        ctx = getattr(self, "ctx", None)
+        if ctx is not None and event.type() == QEvent.Type.LocaleChange:
+            if ctx.settings.language == "system":
+                ctx.i18n.set_language("system")
+        super().changeEvent(event)
 
     # -- shutdown
     def closeEvent(self, event) -> None:  # noqa: N802

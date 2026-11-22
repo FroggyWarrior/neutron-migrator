@@ -74,6 +74,9 @@ def main() -> None:
 
     settings = Settings.load()
     i18n = I18n(settings.language)
+    if settings.language != "system" and settings.language not in i18n.available():
+        settings.language = "system"
+        i18n.set_language("system")
     themes = ThemeManager(app, settings.theme)
     engine = ProtonCliEngine(data_dir())
     ctx = Context(settings=settings, i18n=i18n, themes=themes, engine=engine)

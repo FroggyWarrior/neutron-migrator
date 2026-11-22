@@ -41,7 +41,7 @@ def data_dir() -> Path:
 
 @dataclass
 class Settings:
-    language: str = "en"            # en | es | ...
+    language: str = "system"       # system | en | es | zh | ...
     theme: str = "system"          # dark | light | system
     keep_session: bool = False
     concurrency: int = 4
