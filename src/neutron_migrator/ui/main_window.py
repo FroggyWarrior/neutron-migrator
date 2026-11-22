@@ -110,5 +110,9 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
             worker.cancel()
+            if not worker.wait(8000):
+                self.ctx.engine.shutdown(
+                    keep=bool(self.ctx.settings.keep_session and self.ctx.account))
+                worker.wait(3000)
             worker.wait(8000)
         event.accept()

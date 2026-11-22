@@ -3,8 +3,10 @@ from __future__ import annotations
 import platform
 import sys
 import traceback
+import re
 from datetime import datetime, timezone
 
+from pathlib import Path
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QGuiApplication, QFont
 from shiboken6 import isValid
@@ -82,7 +84,12 @@ def build_debug(ctx, exc: BaseException) -> str:
         parts += ["Context:", exc.debug, ""]
     parts += ["Traceback:", "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
               "", "Engine log (tail):", ctx.engine.log_tail(80)]
-    return security.redact("\n".join(parts))
+    text = "\n".join(parts)
+    home = str(Path.home())
+    if len(home) > 3:
+        text = text.replace(home, "~")
+    text = re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "[email redacted]", text)
+    return security.redact(text)
 
 
 class ErrorDialog(QDialog):

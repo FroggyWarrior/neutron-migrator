@@ -110,6 +110,7 @@ class LoginScreen(Screen):
 
     def _start_failed(self, exc) -> None:
         self.keep.setEnabled(True)
+        self.signin.setEnabled(True)
         self.fail(exc)
         self.i18n.bind(self.status, "error.cli_start")
 
@@ -123,11 +124,12 @@ class LoginScreen(Screen):
 
     def sign_in(self) -> None:
         engine = self.ctx.engine
-        self._launch(lambda c, r: (engine.login_via_browser(c, r), engine.account_name())[1])
+        self._launch(lambda c, r: (engine.start(), engine.login_via_browser(c, r),
+                                   engine.account_name())[2])
 
     def resume_session(self) -> None:
         engine = self.ctx.engine
-        self._launch(lambda c, r: (engine.resume(), engine.account_name())[1])
+        self._launch(lambda c, r: (engine.start(), engine.resume(), engine.account_name())[2])
 
     def _cancel(self) -> None:
         if self.worker:
@@ -223,6 +225,7 @@ class ActionScreen(Screen):
         self.kind = kind
         self.scan_result = None
         self._pending_home = False
+        self._rescan_pending = False
         self._scan_notes = ""
         self._elapsed = 0
         self.root.addWidget(label(self.i18n, f"action.{kind}_title", "h1"))
@@ -373,6 +376,11 @@ class ActionScreen(Screen):
 
     # -- scan
     def start_scan(self) -> None:
+        if self.worker is not None and self.worker.isRunning():
+            self._rescan_pending = True
+            self.worker.cancel()
+            return
+        self._rescan_pending = False
         self.scan_result = None
         self._scan_notes = ""
         self.confirm.setEnabled(False)
@@ -393,10 +401,14 @@ class ActionScreen(Screen):
     def _scan_done(self, result) -> None:
         self._timer.stop()
         self.scan_bar.setVisible(False)
-        self.scan_result = result
         if self._pending_home:
             self.ctx.go("home")
             return
+        if self._rescan_pending:
+            self._rescan_pending = False
+            self.start_scan()
+            return
+        self.scan_result = result
         if result.count == 0:
             self.i18n.bind(self.summary, "action.found_none")
         else:
@@ -416,11 +428,16 @@ class ActionScreen(Screen):
     def _scan_failed(self, exc) -> None:
         self._timer.stop()
         self.scan_bar.setVisible(False)
-        if isinstance(exc, Cancelled) or self._pending_home:
+        if self._pending_home:
             self.ctx.go("home")
             return
+        if self._rescan_pending:
+            self._rescan_pending = False
+            self.start_scan()
+            return
         self.i18n.bind(self.summary, "action.found_none")
-        self.fail(exc)
+        if not isinstance(exc, Cancelled):
+            self.fail(exc)
 
     # -- confirm
     def _update_confirm(self) -> None:
