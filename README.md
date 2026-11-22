@@ -24,6 +24,7 @@
 ## Table of contents
 
 - [What it does](#what-it-does)
+- [Use cases](#use-cases)
 - [How it works](#how-it-works)
 - [Privacy and security](#privacy-and-security)
 - [Download and requirements](#download-and-requirements)
