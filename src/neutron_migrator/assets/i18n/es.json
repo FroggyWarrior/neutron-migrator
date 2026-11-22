@@ -42,7 +42,7 @@
   "home.title": "¿Qué quieres hacer?",
   "home.account": "Sesión iniciada como {account}",
   "home.download_title": "Descargar todas las fotos",
-  "home.download_desc": "Copia todas las fotos de tu Proton Drive a una carpeta de este equipo, conservando la estructura de carpetas.",
+  "home.download_desc": "Copia todas las fotos de tu Proton Drive a una carpeta de este equipo.",
   "home.delete_title": "Eliminar todas las fotos",
   "home.delete_desc": "Mueve las fotos de tu Proton Drive a la papelera o bórralas definitivamente.",
   "home.start": "Empezar",
@@ -61,7 +61,7 @@
   "action.delete_mode": "Modo de borrado",
   "action.mode_trash": "Mover a la papelera (recuperable)",
   "action.mode_permanent": "Eliminar definitivamente (no se puede deshacer)",
-  "action.permanent_ack": "Entiendo que se vaciará por completo la papelera de Drive.",
+  "action.permanent_ack": "Entiendo que estas fotos se eliminarán definitivamente y no se podrán recuperar.",
   "action.confirm_download": "Descargar {count} fotos",
   "action.confirm_trash": "Mover {count} fotos a la papelera",
   "action.confirm_permanent": "Eliminar definitivamente {count} fotos",
@@ -95,7 +95,7 @@
   "error.unsupported_version": "rclone {version} es demasiado antiguo. Instala rclone 1.65 o superior.",
   "error.network": "No se ha podido contactar con Proton. Revisa tu conexión, VPN, proxy o firewall.",
   "error.scan_failed": "No se ha podido analizar tu Drive.",
-  "error.permanent_failed": "Las fotos se movieron a la papelera, pero no se pudo vaciar. Puedes vaciarla manualmente en Proton Drive.",
+  "error.permanent_failed": "Algunas fotos se movieron a la papelera, pero no se pudieron eliminar definitivamente. Puedes borrarlas manualmente en Proton Drive.",
   "error.keyring": "El llavero del sistema no está disponible, así que la sesión no se puede guardar de forma segura. Solo existirá en memoria durante esta ejecución.",
   "error.generic": "Error inesperado: {message}",
   "login.subtitle": "El inicio de sesión ocurre en tu navegador, en la web de Proton. Neutron Migrator nunca ve tu contraseña, tus códigos 2FA ni tus llaves de seguridad.",
@@ -124,5 +124,6 @@
   "action.unknown_sizes": "{count} elementos no informan de su tamaño; el total mostrado es un mínimo.",
   "action.videos_skipped": "Se excluyen {count} vídeos ({size}). Marca la casilla de arriba para incluirlos.",
   "progress.retrying": "Problema de conexión. Esperando y reintentando…",
-  "result.retry_failed": "Reintentar {count} fallidos"
+  "result.retry_failed": "Reintentar {count} fallidos",
+  "about.ai_assisted": "Desarrollado con asistencia de IA y probado por una persona. Esta app no contiene IA y nunca envía tus datos a servicios de IA."
 }

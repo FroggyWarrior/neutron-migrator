@@ -42,7 +42,7 @@
   "home.title": "What do you want to do?",
   "home.account": "Signed in as {account}",
   "home.download_title": "Download all photos",
-  "home.download_desc": "Copy every photo from your Proton Drive to a folder on this computer, keeping the folder structure.",
+  "home.download_desc": "Copy every photo from your Proton Drive to a folder on this computer.",
   "home.delete_title": "Delete all photos",
   "home.delete_desc": "Move your Proton Drive photos to the trash, or erase them permanently.",
   "home.start": "Start",
@@ -61,7 +61,7 @@
   "action.delete_mode": "Deletion mode",
   "action.mode_trash": "Move to trash (recoverable)",
   "action.mode_permanent": "Delete permanently (cannot be undone)",
-  "action.permanent_ack": "I understand that the whole Drive trash will be permanently erased.",
+  "action.permanent_ack": "I understand these photos will be permanently erased and cannot be recovered.",
   "action.confirm_download": "Download {count} photos",
   "action.confirm_trash": "Move {count} photos to trash",
   "action.confirm_permanent": "Permanently delete {count} photos",
@@ -95,7 +95,7 @@
   "error.unsupported_version": "rclone {version} is too old. Install rclone 1.65 or newer.",
   "error.network": "Could not reach Proton. Check your connection, VPN, proxy or firewall.",
   "error.scan_failed": "Your Drive could not be scanned.",
-  "error.permanent_failed": "The photos were moved to the trash, but the trash could not be emptied. You can empty it manually in Proton Drive.",
+  "error.permanent_failed": "Some photos were moved to the trash but could not be permanently deleted. You can delete them manually in Proton Drive.",
   "error.keyring": "Your OS keychain is unavailable, so the session cannot be stored safely. It will live in memory only for this run.",
   "error.generic": "Unexpected error: {message}",
   "login.subtitle": "Sign-in happens in your browser on Proton's website. Neutron Migrator never sees your password, 2FA codes or security keys.",
@@ -124,5 +124,6 @@
   "action.unknown_sizes": "{count} items report no size; the total shown is a lower bound.",
   "action.videos_skipped": "{count} videos ({size}) are excluded. Tick the box above to include them.",
   "progress.retrying": "Connection problem. Waiting and retrying…",
-  "result.retry_failed": "Retry {count} failed"
+  "result.retry_failed": "Retry {count} failed",
+  "about.ai_assisted": "Developed with AI assistance and tested by a human. This app contains no AI and never sends your data to AI services."
 }
