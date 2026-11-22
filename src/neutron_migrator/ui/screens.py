@@ -103,6 +103,7 @@ class LoginScreen(Screen):
         saved, account = result
         self.signin.setEnabled(True)
         self.keep.setEnabled(True)
+        self.i18n.unbind(self.status)
         self.status.clear()
         if saved:
             self.ctx.account = account
@@ -162,6 +163,7 @@ class LoginScreen(Screen):
         self.signin.setEnabled(True)
         self.resume.setEnabled(True)
         self.cancel_btn.setVisible(False)
+        self.i18n.unbind(self.status)
         self.status.clear()
         if isinstance(exc, Cancelled):
             return
@@ -548,6 +550,7 @@ class ProgressScreen(Screen):
                 speed=format_size(self.i18n, p.speed), eta=eta))
         else:
             self.stats.setText(self.i18n.t("progress.files", done=p.done_files, total=p.total_files))
+        self.i18n.unbind(self.current)
         self.current.setText(self.i18n.t("progress.current", path=p.current) if p.current else "")
 
     def _cancel(self) -> None:

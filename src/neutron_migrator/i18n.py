@@ -105,6 +105,10 @@ class I18n(QObject):
         self._bindings[(id(widget), prop)] = (widget, prop, key, params)
         self._apply(widget, prop, self.t(key, **params))
 
+    def unbind(self, widget: Any, prop: str = "text") -> None:
+        """Forget a binding, so a later retranslate cannot restore stale text."""
+        self._bindings.pop((id(widget), prop), None)
+
     def _rebind(self) -> None:
         for handle, (widget, prop, key, params) in list(self._bindings.items()):
             if not isValid(widget):
